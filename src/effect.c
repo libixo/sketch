@@ -1,0 +1,4 @@
+#ifndef TRACKER_EFFECT_C
+#define TRACKER_EFFECT_C
+
+#endif /* TRACKER_EFFECT_C */
