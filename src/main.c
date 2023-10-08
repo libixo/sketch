@@ -18,7 +18,7 @@ Window *_w;
 Module *_m;
 Module *_m_rt;
 
-void cleanup(int);
+void cleanup(void);
 
 #include "event.h"
 #include "ui/ui.h"
@@ -26,12 +26,22 @@ void cleanup(int);
 #define FRAMETIME 20 * 1000000 /* multiplied by 1 million to get milliseconds */
 
 /* never returns */
-void cleanup(int signal)
+void cleanup(void)
 {
+	VALGRIND_PRINTF("cleanup\n");
 	freeModule(_m);
 	freeWindow(_w);
 	freeTerminal();
+
+	sigaction(SIGINT, &(struct sigaction){.sa_handler = SIG_DFL}, NULL); /* avoid locking up sigint */
+
 	exit(0);
+}
+
+static void _quitHandler(int signal)
+{
+	VALGRIND_PRINTF("_quitHandler\n");
+	pushEvent(QUEUE_MAIN, (Event){EVENT_QUIT, NULL});
 }
 
 int main(int argc, char *argv[])
@@ -39,7 +49,7 @@ int main(int argc, char *argv[])
 	struct timespec req;
 
 	/* set signals */
-	signal(SIGINT, cleanup);
+	sigaction(SIGINT, &(struct sigaction){.sa_handler = _quitHandler}, NULL);
 
 	allocTerminal();
 
@@ -47,7 +57,7 @@ int main(int argc, char *argv[])
 	_w = allocWindow();
 
 	/* initialize the screen */
-	pushEvent(QUEUE_MAIN, (Event){EVENT_REDRAW, NULL});
+	_w->redraw = 1;
 
 	while (true)
 	{

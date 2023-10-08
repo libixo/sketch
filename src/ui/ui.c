@@ -9,13 +9,14 @@ Rect _windowSize;
 
 static void _winchHandler(int signal)
 {
-	struct winsize w;
-	ioctl(0, TIOCGWINSZ, &w);
+	VALGRIND_PRINTF("_winchHandler\n");
+	struct winsize winsz;
+	ioctl(0, TIOCGWINSZ, &winsz);
 	_windowSize.x = 0;
 	_windowSize.y = 0;
-	_windowSize.w = w.ws_col;
-	_windowSize.h = w.ws_row;
-	pushEvent(QUEUE_MAIN, (Event){EVENT_REDRAW, NULL});
+	_windowSize.w = winsz.ws_col;
+	_windowSize.h = winsz.ws_row;
+	_w->redraw = 1;
 }
 
 void allocTerminal(void)
@@ -27,7 +28,7 @@ void allocTerminal(void)
 	tcsetattr(0, TCSANOW, &tc);
 
 	/* set signals */
-	signal(SIGWINCH, _winchHandler);
+	sigaction(SIGINT, &(struct sigaction){.sa_handler = _winchHandler}, NULL);
 
 	puts("\033[?1049h"); /* set the alt screen buffer */
 }
@@ -62,32 +63,35 @@ void draw(void)
 
 	_drawPage();
 
+	switch (_w->page)
+	{
+		case PAGE_GENERAL: drawGeneral(); break;
+	}
+
 	/* explicitly dump stdin */
 	printf("\n");
 	fflush(stdin);
 }
 
 /* returns true if input was handled */
-int _uiInput(int input)
+int _inputUI(int input)
 {
 	switch (input)
 	{
-		case MOD_CTRL + 'X': /* quit   */ pushEvent(QUEUE_MAIN, (Event){EVENT_QUIT,   NULL}); return 1;
-		case MOD_CTRL + 'L': /* redraw */ pushEvent(QUEUE_MAIN, (Event){EVENT_REDRAW, NULL}); return 1;
+		case MOD_CTRL + 'X': /* quit   */ pushEvent(QUEUE_MAIN, (Event){EVENT_QUIT, NULL}); return 1;
+		case MOD_CTRL + 'L': /* redraw */ _w->redraw = 1; return 1;
 		case '\033':
-			switch (input = getchar())
-			{
-				case '[': switch (input = getchar())
-				{
-					case 'O': switch (input = getchar())
-					{
-						case 'P': /* F1 */ _w->page = 0; pushEvent(QUEUE_MAIN, (Event){EVENT_REDRAW, NULL}); break;
-						case 'Q': /* F2 */ _w->page = 1; pushEvent(QUEUE_MAIN, (Event){EVENT_REDRAW, NULL}); break;
-						case 'R': /* F3 */ _w->page = 2; pushEvent(QUEUE_MAIN, (Event){EVENT_REDRAW, NULL}); break;
-						case 'S': /* F4 */ _w->page = 3; pushEvent(QUEUE_MAIN, (Event){EVENT_REDRAW, NULL}); break;
-					} break;
+			switch (input = getchar()) {
+				case 'O': switch (input = getchar()) { /* SS3 */
+					case 'P': /* F1 */ _w->page = 0; _w->redraw = 1; break;
+					case 'Q': /* F2 */ _w->page = 1; _w->redraw = 1; break;
+					case 'R': /* F3 */ _w->page = 2; _w->redraw = 1; break;
+					case 'S': /* F4 */ _w->page = 3; _w->redraw = 1; break;
+				} break;
+				case '[': switch (input = getchar()) { /* CSI */
 				} break;
 			} return 1;
+		default: return 0;
 	}
 	return 0;
 }
@@ -100,7 +104,8 @@ void input(void)
 	int input;
 	while ((input = getchar()) != EOF)
 	{
-		_uiInput(input);
+		if (_inputUI(input)) break;
+		if (inputGeneral(input)) break;
 	}
 	fcntl(0, F_SETFL, status); /* reset the old file descriptor flags */
 }

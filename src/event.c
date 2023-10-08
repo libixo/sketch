@@ -14,7 +14,6 @@ Queue _eventQueue[EVENT_QUEUE_COUNT] = {0};
 void procEvents(int queue)
 {
 	Event *e;
-	bool redraw = 0;
 	Queue *q = &_eventQueue[queue];
 	while (q->pos)
 	{
@@ -24,17 +23,18 @@ void procEvents(int queue)
 		{
 			case EVENT_NULL:
 				break;
-			case EVENT_REDRAW:
-				redraw = 1;
-				break;
 			case EVENT_QUIT:
-				cleanup(0);
+				cleanup();
 				break;
 		}
 	}
 
-	if (redraw)
+	if (_w->redraw)
+	{
+		_w->redraw = 0;
+		VALGRIND_PRINTF("handling redraw\n");
 		draw();
+	}
 }
 
 void pushEvent(int queue, Event e)

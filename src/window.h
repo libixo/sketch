@@ -18,12 +18,22 @@ char *PageNames[PAGE_COUNT] =
 	[PAGE_INSTRUMENT] = "INSTRUMENT",
 };
 
+typedef struct Pos
+{
+	int x;
+	int y;
+} Pos;
+
 
 typedef struct Window
 {
 	Page page;
 
+	Pos cursor;
+
 	InstrumentIndex instrument;
+
+	int redraw; /* set high to request a redraw */
 } Window;
 
 Window *allocWindow(void);

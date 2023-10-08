@@ -11,7 +11,6 @@
 typedef enum EventCode
 {
 	EVENT_NULL,
-	EVENT_REDRAW,
 	EVENT_QUIT,
 } EventCode;
 
